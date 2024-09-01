@@ -30,29 +30,28 @@ def convert_json_to_properties(json_content, destination_properties_path, png_fi
         file_name_lower = os.path.basename(destination_properties_path).replace('.properties', '').lower()
         texture_file_name = os.path.basename(png_file)
         with open(destination_properties_path, 'w') as properties_file:
-            properties_file.write(f"type=item\n")
+            properties_file.write("type=item\n")
             if item_id:
                 properties_file.write(f"items={item_id}\n")
             properties_file.write(f"texture={texture_file_name}\n")
             properties_file.write(f"nbt.ExtraAttributes.id={file_name_lower}\n")
     except json.JSONDecodeError:
-        print(f"\nERROR: Error decoding JSON content.\n")
+        print("ERROR: Error decoding JSON content.")
 
 def extract_files(source_folder, cit_folder, ctm_folder, exclude_files=None):
-    png_files = []
-    
     if exclude_files is None:
         exclude_files = []
+
+    png_files = []
 
     for root, _, files in os.walk(source_folder):
         for file in files:
             if file.lower().endswith('.png') and file.lower() not in exclude_files:
                 source_file = os.path.join(root, file)
                 relative_path = os.path.relpath(root, source_folder)
-                
-                # Create a directory named after the base name of the file
+
                 file_base_name = file.lower().replace('.png', '')
-                destination_dir = os.path.join(cit_folder if "dwarven_mines" not in relative_path and "crystal_hollows" not in relative_path else ctm_folder, relative_path, file_base_name)
+                destination_dir = os.path.join(ctm_folder if "dwarven_mines" in relative_path or "crystal_hollows" in relative_path else cit_folder, relative_path, file_base_name)
                 
                 os.makedirs(destination_dir, exist_ok=True)
                 destination_file = os.path.join(destination_dir, file.lower())
@@ -63,19 +62,20 @@ def extract_files(source_folder, cit_folder, ctm_folder, exclude_files=None):
 
 def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder):
     current_script_dir = os.path.dirname(os.path.abspath(__file__))
-    crystal_hollows_properties_folder = os.path.join(current_script_dir, 'crystal_hollows_properties')
-    dwarven_mines_properties_folder = os.path.join(current_script_dir, 'dwarven_mines_properties')
+    local_properties_folders = {
+        'crystal_hollows': os.path.join(current_script_dir, 'crystal_hollows_properties'),
+        'dwarven_mines': os.path.join(current_script_dir, 'dwarven_mines_properties')
+    }
 
     for file, destination_dir in png_files:
         item_name = file.replace('.png', '').lower()
-        json_file_upper = item_name.upper() + '.json'
         properties_file_lower = item_name + '.properties'
-
         local_properties_folder = None
+
         if "dwarven_mines" in destination_dir:
-            local_properties_folder = dwarven_mines_properties_folder
+            local_properties_folder = local_properties_folders['dwarven_mines']
         elif "crystal_hollows" in destination_dir:
-            local_properties_folder = crystal_hollows_properties_folder
+            local_properties_folder = local_properties_folders['crystal_hollows']
 
         if local_properties_folder:
             local_properties_path = os.path.join(local_properties_folder, properties_file_lower)
@@ -85,121 +85,83 @@ def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder):
                 continue
 
         try:
-            json_file_path = f"items/{json_file_upper}"
+            json_file_path = f"items/{item_name.upper()}.json"
             file_content = repo.get_contents(json_file_path)
             json_content = file_content.decoded_content.decode('utf-8')
             destination_properties_path = os.path.join(destination_dir, properties_file_lower)
             convert_json_to_properties(json_content, destination_properties_path, os.path.join(destination_dir, file.lower()))
-            print(f"SUCCESS: Converted {json_file_upper} to {properties_file_lower} and moved to {destination_dir}")
+            print(f"SUCCESS: Converted {json_file_path} to {properties_file_lower} and moved to {destination_dir}")
         except Exception as e:
-            print(f"\nERROR: Could not find or convert {json_file_upper}: {e}\n")
+            print(f"ERROR: Could not find or convert {json_file_path}: {e}")
 
-# Check if a file exists in a folder
 def file_exists_in_folder(file_name, folder):
     return os.path.exists(os.path.join(folder, file_name))
 
-# For spacing
-print()
-
-# Ask the user to select the folder containing files
+# Main process
 source_folder = select_folder()
 if not source_folder:
-    print("\nERROR: No folder selected!\n")
+    print("ERROR: No folder selected!")
     exit()
 
-# Set up paths for pack.png, pack.mcmeta, and credits.txt in the current script's directory
 current_script_dir = os.path.dirname(os.path.abspath(__file__))
 pack_png_path = os.path.join(source_folder, 'pack.png')
 pack_mcmeta_path = os.path.join(current_script_dir, 'pack.mcmeta')
 credits_source_path = os.path.join(current_script_dir, 'credits.txt')
 
 if not os.path.exists(pack_png_path):
-    print("\nERROR: pack.png not found!\n")
+    print("ERROR: pack.png not found!")
     exit()
 
-if not os.path.exists(pack_mcmeta_path):
-    print("\npack.mcmeta not found, continuing without it...\n")
-
-# Prompt the user for the new folder name
 destination_folder_name = prompt_for_folder_name()
 if not destination_folder_name:
-    print("\nERROR: no folder name provided!\n")
+    print("ERROR: no folder name provided!")
     exit()
 
-# Create the base folder
 base_folder = os.path.join(os.getcwd(), destination_folder_name)
-
-# Define the folder paths within the base folder
-assets_folder = os.path.join(base_folder, 'assets')
-minecraft_folder = os.path.join(assets_folder, 'minecraft')
-mcpatcher_cit_folder = os.path.join(minecraft_folder, 'mcpatcher', 'cit')
-mcpatcher_ctm_folder = os.path.join(minecraft_folder, 'mcpatcher', 'ctm')
-
-# Create the necessary directories
+mcpatcher_cit_folder = os.path.join(base_folder, 'assets', 'minecraft', 'mcpatcher', 'cit')
+mcpatcher_ctm_folder = os.path.join(base_folder, 'assets', 'minecraft', 'mcpatcher', 'ctm')
 os.makedirs(mcpatcher_cit_folder, exist_ok=True)
 os.makedirs(mcpatcher_ctm_folder, exist_ok=True)
 
-# Copy pack.png to the base folder
 shutil.copy2(pack_png_path, base_folder)
 print(f"SUCCESS: Moved pack.png to {base_folder}")
 
-# Copy pack.mcmeta to the base folder if it exists
 if os.path.exists(pack_mcmeta_path):
     shutil.copy2(pack_mcmeta_path, base_folder)
     print(f"SUCCESS: Moved pack.mcmeta to {base_folder}")
 
-# Clone credits.txt from the current script's directory
-creditsfile = True
+creditsfile = False
 if os.path.exists(credits_source_path):
     shutil.copy2(credits_source_path, base_folder)
     print(f"SUCCESS: Cloned credits.txt to {base_folder}")
     creditsfile = True
-else:
-    print("\nWARNING: credits.txt not found, continuing without it...")
-    creditsfile = False
 
-# Spacing again
-print()
-
-# Extract .png files and maintain the original folder structure under 'cit' and 'ctm'
 exclude_files = ['pack.png', 'pack.mcmeta']
 png_files = extract_files(source_folder, mcpatcher_cit_folder, mcpatcher_ctm_folder, exclude_files)
 
-# Copy corresponding .json files from the GitHub repo and create .properties files or use local properties files
 copy_files_or_use_local_properties(png_files, neurepo, mcpatcher_cit_folder, mcpatcher_ctm_folder)
 
-# Zip the folder into a .zip file
 zip_file_name = f"{destination_folder_name}.zip"
-zip_file_path = os.path.join(os.getcwd(), zip_file_name)
-
-with zipfile.ZipFile(zip_file_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-    for root, dirs, files in os.walk(base_folder):
+with zipfile.ZipFile(os.path.join(os.getcwd(), zip_file_name), 'w', zipfile.ZIP_DEFLATED) as zipf:
+    for root, _, files in os.walk(base_folder):
         for file in files:
-            file_path = os.path.join(root, file)
-            zipf.write(file_path, os.path.relpath(file_path, os.getcwd()))
+            zipf.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), os.getcwd()))
 
-print(f"\nSUCCESS: Folder {destination_folder_name} was zipped into {zip_file_name}\n")
+print(f"SUCCESS: Folder {destination_folder_name} was zipped into {zip_file_name}")
 
-# Check if all files were copied
+# Final check
 all_files_copied = True
-
-# Check if pack.png was copied
 if not file_exists_in_folder('pack.png', base_folder):
-    print("\nERROR: pack.png was not successfully copied!\n")
+    print("ERROR: pack.png was not successfully copied!")
     all_files_copied = False
-
-# Check if pack.mcmeta was copied, only if it exists
 if os.path.exists(pack_mcmeta_path) and not file_exists_in_folder('pack.mcmeta', base_folder):
-    print("\nERROR: pack.mcmeta was not successfully copied!\n")
+    print("ERROR: pack.mcmeta was not successfully copied!")
+    all_files_copied = False
+if creditsfile and not file_exists_in_folder('credits.txt', base_folder):
+    print("ERROR: credits.txt was not successfully copied!")
     all_files_copied = False
 
-# Check if credits.txt was copied
-if not file_exists_in_folder('credits.txt', base_folder) and creditsfile == True:
-    print("\nERROR: credits.txt was not successfully copied!\n")
-    all_files_copied = False
-
-# Final status message
 if all_files_copied:
-    print("\nAll files were successfully copied and verified!\n")
+    print("All files were successfully copied and verified!")
 else:
-    print("\nSome files were not successfully copied. Please check the errors above.\n")
+    print("Some files were not successfully copied. Please check the errors above.")
