@@ -8,11 +8,13 @@ Note that all this does is make the .properties files for an already setup textu
 
 2. Make sure you have you pack prepared (this includes having all images sorted into the right folders and subfolders)
 
-    a. All textures MUST be named after the skyblock item/block that they will be used on (use [neu repo](https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO/tree/master/items) for the names to use if you arent sure what to name the images)
+    - All textures MUST be named after the skyblock item/block that they will be used on (use [neu repo](https://github.com/NotEnoughUpdates/NotEnoughUpdates-REPO/tree/master/items) for the names to use if you arent sure what to name the images)
 
-    b. A png file named 'pack.png' must be included for the pack cover
+    - A png file named 'pack.png' must be included for the pack cover
 
-    c. A '.mcmeta' file must be included for pack descrption ([template](pack.mcmeta) provided)
+    - A '.mcmeta' file must be included for pack descrption ([template](pack.mcmeta) provided)
+
+        - You can use minecraft MOTD formatting codes in the description, which you can see [Here](https://htmlcolorcodes.com/minecraft-color-codes/)
 
 3. Done!
 
