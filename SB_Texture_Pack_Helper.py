@@ -6,7 +6,7 @@ from tkinter import Tk, filedialog, simpledialog
 from github import Github
 
 # Authenticate and access the repository
-g = Github()  # You can pass your GitHub token here if needed, e.g., Github("your_token")
+g = Github()
 neurepo = g.get_repo("NotEnoughUpdates/NotEnoughUpdates-REPO")
 
 def select_folder():
