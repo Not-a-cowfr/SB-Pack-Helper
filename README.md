@@ -12,7 +12,7 @@ Note that all this does is make the .properties files for an already setup textu
 
     b. A png file named 'pack.png' must be included for the pack cover
 
-    c. A '.mcmeta' file must be included for pack descrption ([template](example_description.mcmeta) provided)
+    c. A '.mcmeta' file must be included for pack descrption ([template](pack.mcmeta) provided)
 
 3. Done!
 
