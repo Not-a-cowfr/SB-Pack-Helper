@@ -1,6 +1,6 @@
 # Hypixel Skyblock Texture Pack Helper 
 
-Note that all this does is make the .properties files for an already setup resource pack
+Note that all this does is make and write the .properties files for an already setup resource pack
 
 ### HOW TO USE:
 
