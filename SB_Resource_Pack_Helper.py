@@ -2,10 +2,10 @@ import os
 import shutil
 import json
 import zipfile
+import time
 from tkinter import Tk, filedialog, simpledialog
 from github import Github
 
-# Authenticate and access the repository
 g = Github()
 neurepo = g.get_repo("NotEnoughUpdates/NotEnoughUpdates-REPO")
 
@@ -51,8 +51,10 @@ def extract_files(source_folder, cit_folder, ctm_folder, exclude_files=None):
                 relative_path = os.path.relpath(root, source_folder)
 
                 file_base_name = file.lower().replace('.png', '')
-                destination_dir = os.path.join(ctm_folder if "dwarven_mines" in relative_path or "crystal_hollows" in relative_path else cit_folder, relative_path, file_base_name)
-                
+                destination_dir = os.path.join(
+                    ctm_folder if "dwarven_mines" in relative_path or "crystal_hollows" in relative_path else cit_folder,
+                    relative_path, file_base_name)
+
                 os.makedirs(destination_dir, exist_ok=True)
                 destination_file = os.path.join(destination_dir, file.lower())
                 shutil.copy2(source_file, destination_file)
@@ -60,7 +62,9 @@ def extract_files(source_folder, cit_folder, ctm_folder, exclude_files=None):
 
     return png_files
 
-def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder):
+
+def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder,
+                                       delay_between_copies=False):
     current_script_dir = os.path.dirname(os.path.abspath(__file__))
     local_properties_folders = {
         'crystal_hollows': os.path.join(current_script_dir, 'crystal_hollows_properties'),
@@ -82,6 +86,8 @@ def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder):
             if os.path.exists(local_properties_path):
                 shutil.copy2(local_properties_path, os.path.join(destination_dir, properties_file_lower))
                 print(f"SUCCESS: Used local properties for {item_name} from {local_properties_folder}")
+                if delay_between_copies:
+                    time.sleep(2)
                 continue
 
         try:
@@ -89,15 +95,18 @@ def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder):
             file_content = repo.get_contents(json_file_path)
             json_content = file_content.decoded_content.decode('utf-8')
             destination_properties_path = os.path.join(destination_dir, properties_file_lower)
-            convert_json_to_properties(json_content, destination_properties_path, os.path.join(destination_dir, file.lower()))
+            convert_json_to_properties(json_content, destination_properties_path,
+                                       os.path.join(destination_dir, file.lower()))
             print(f"SUCCESS: Converted {json_file_path} to {properties_file_lower} and moved to {destination_dir}")
         except Exception as e:
             print(f"ERROR: Could not find or convert {json_file_path}: {e}")
 
+        if delay_between_copies:
+            time.sleep(2)
+
 def file_exists_in_folder(file_name, folder):
     return os.path.exists(os.path.join(folder, file_name))
 
-# Main process
 source_folder = select_folder()
 if not source_folder:
     print("ERROR: No folder selected!")
@@ -139,7 +148,8 @@ if os.path.exists(credits_source_path):
 exclude_files = ['pack.png', 'pack.mcmeta']
 png_files = extract_files(source_folder, mcpatcher_cit_folder, mcpatcher_ctm_folder, exclude_files)
 
-copy_files_or_use_local_properties(png_files, neurepo, mcpatcher_cit_folder, mcpatcher_ctm_folder)
+copy_files_or_use_local_properties(png_files, neurepo, mcpatcher_cit_folder, mcpatcher_ctm_folder,
+                                   delay_between_copies=True)
 
 zip_file_name = f"{destination_folder_name}.zip"
 with zipfile.ZipFile(os.path.join(os.getcwd(), zip_file_name), 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -149,7 +159,6 @@ with zipfile.ZipFile(os.path.join(os.getcwd(), zip_file_name), 'w', zipfile.ZIP_
 
 print(f"SUCCESS: Folder {destination_folder_name} was zipped into {zip_file_name}")
 
-# Final check
 all_files_copied = True
 if not file_exists_in_folder('pack.png', base_folder):
     print("ERROR: pack.png was not successfully copied!")
