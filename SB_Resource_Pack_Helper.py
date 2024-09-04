@@ -36,7 +36,7 @@ def convert_json_to_properties(json_content, destination_properties_path, png_fi
             properties_file.write(f"texture={texture_file_name}\n")
             properties_file.write(f"nbt.ExtraAttributes.id={file_name_lower}\n")
     except json.JSONDecodeError:
-        print("ERROR: Error decoding JSON content.")
+        log_message("ERROR: Error decoding JSON content.")
 
 def extract_files(source_folder, cit_folder, ctm_folder, exclude_files=None):
     if exclude_files is None:
@@ -49,7 +49,6 @@ def extract_files(source_folder, cit_folder, ctm_folder, exclude_files=None):
             if file.lower().endswith('.png') and file.lower() not in exclude_files:
                 source_file = os.path.join(root, file)
                 relative_path = os.path.relpath(root, source_folder)
-
                 file_base_name = file.lower().replace('.png', '')
                 destination_dir = os.path.join(
                     ctm_folder if "dwarven_mines" in relative_path or "crystal_hollows" in relative_path else cit_folder,
@@ -62,9 +61,8 @@ def extract_files(source_folder, cit_folder, ctm_folder, exclude_files=None):
 
     return png_files
 
-
-def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder,
-                                       delay_between_copies=False):
+# uh make delay between copies like toggleable or smth, and/or add a slider/input to choose the delay
+def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder, delay_between_copies=False):
     current_script_dir = os.path.dirname(os.path.abspath(__file__))
     local_properties_folders = {
         'crystal_hollows': os.path.join(current_script_dir, 'crystal_hollows_properties'),
@@ -85,7 +83,7 @@ def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder,
             local_properties_path = os.path.join(local_properties_folder, properties_file_lower)
             if os.path.exists(local_properties_path):
                 shutil.copy2(local_properties_path, os.path.join(destination_dir, properties_file_lower))
-                print(f"SUCCESS: Used local properties for {item_name} from {local_properties_folder}")
+                log_message(f"SUCCESS: Used local properties for {item_name} from {local_properties_folder}")
                 if delay_between_copies:
                     time.sleep(2)
                 continue
@@ -97,9 +95,9 @@ def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder,
             destination_properties_path = os.path.join(destination_dir, properties_file_lower)
             convert_json_to_properties(json_content, destination_properties_path,
                                        os.path.join(destination_dir, file.lower()))
-            print(f"SUCCESS: Converted {json_file_path} to {properties_file_lower} and moved to {destination_dir}")
+            log_message(f"SUCCESS: Converted {json_file_path} to {properties_file_lower} and moved to {destination_dir}")
         except Exception as e:
-            print(f"ERROR: Could not find or convert {json_file_path}: {e}")
+            log_message(f"ERROR: Could not find or convert {json_file_path}: {e}")
 
         if delay_between_copies:
             time.sleep(2)
@@ -107,9 +105,13 @@ def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder,
 def file_exists_in_folder(file_name, folder):
     return os.path.exists(os.path.join(folder, file_name))
 
+def log_message(message):
+    with open(log_file_path, 'a') as log_file:
+        log_file.write(message + '\n')
+
 source_folder = select_folder()
 if not source_folder:
-    print("ERROR: No folder selected!")
+    log_message("ERROR: No folder selected!")
     exit()
 
 current_script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -118,59 +120,68 @@ pack_mcmeta_path = os.path.join(current_script_dir, 'pack.mcmeta')
 credits_source_path = os.path.join(current_script_dir, 'credits.txt')
 
 if not os.path.exists(pack_png_path):
-    print("ERROR: pack.png not found!")
+    log_message("ERROR: pack.png not found!")
     exit()
 
 destination_folder_name = prompt_for_folder_name()
 if not destination_folder_name:
-    print("ERROR: no folder name provided!")
+    log_message("ERROR: no folder name provided!")
     exit()
 
-base_folder = os.path.join(os.getcwd(), destination_folder_name)
+output_folder = os.path.join(os.getcwd(), 'output')
+os.makedirs(output_folder, exist_ok=True)
+
+base_folder = os.path.join(output_folder, destination_folder_name)
 mcpatcher_cit_folder = os.path.join(base_folder, 'assets', 'minecraft', 'mcpatcher', 'cit')
 mcpatcher_ctm_folder = os.path.join(base_folder, 'assets', 'minecraft', 'mcpatcher', 'ctm')
 os.makedirs(mcpatcher_cit_folder, exist_ok=True)
 os.makedirs(mcpatcher_ctm_folder, exist_ok=True)
 
+log_file_path = os.path.join(output_folder, f"{destination_folder_name}.log")
+
 shutil.copy2(pack_png_path, base_folder)
-print(f"SUCCESS: Moved pack.png to {base_folder}")
+log_message(f"SUCCESS: Moved pack.png to {base_folder}")
 
 if os.path.exists(pack_mcmeta_path):
     shutil.copy2(pack_mcmeta_path, base_folder)
-    print(f"SUCCESS: Moved pack.mcmeta to {base_folder}")
+    log_message(f"SUCCESS: Moved pack.mcmeta to {base_folder}")
 
 creditsfile = False
 if os.path.exists(credits_source_path):
     shutil.copy2(credits_source_path, base_folder)
-    print(f"SUCCESS: Cloned credits.txt to {base_folder}")
+    log_message(f"SUCCESS: Cloned credits.txt to {base_folder}")
     creditsfile = True
 
 exclude_files = ['pack.png', 'pack.mcmeta']
 png_files = extract_files(source_folder, mcpatcher_cit_folder, mcpatcher_ctm_folder, exclude_files)
 
-copy_files_or_use_local_properties(png_files, neurepo, mcpatcher_cit_folder, mcpatcher_ctm_folder,
-                                   delay_between_copies=True)
+copy_files_or_use_local_properties(png_files, neurepo, mcpatcher_cit_folder, mcpatcher_ctm_folder, delay_between_copies=True)
+
+if os.path.exists(mcpatcher_ctm_folder) and not os.listdir(mcpatcher_ctm_folder):
+    os.rmdir(mcpatcher_ctm_folder)
+    log_message("\nINFO: ctm folder was empty and has been removed.")
 
 zip_file_name = f"{destination_folder_name}.zip"
-with zipfile.ZipFile(os.path.join(os.getcwd(), zip_file_name), 'w', zipfile.ZIP_DEFLATED) as zipf:
+zip_file_path = os.path.join(output_folder, zip_file_name)
+with zipfile.ZipFile(zip_file_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
     for root, _, files in os.walk(base_folder):
         for file in files:
             zipf.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), os.getcwd()))
 
-print(f"SUCCESS: Folder {destination_folder_name} was zipped into {zip_file_name}")
+log_message(f"\nSUCCESS: Folder {destination_folder_name} was zipped into {zip_file_path}")
 
 all_files_copied = True
 if not file_exists_in_folder('pack.png', base_folder):
-    print("ERROR: pack.png was not successfully copied!")
+    log_message("ERROR: pack.png was not successfully copied!")
     all_files_copied = False
 if os.path.exists(pack_mcmeta_path) and not file_exists_in_folder('pack.mcmeta', base_folder):
-    print("ERROR: pack.mcmeta was not successfully copied!")
+    log_message("ERROR: pack.mcmeta was not successfully copied!")
     all_files_copied = False
 if creditsfile and not file_exists_in_folder('credits.txt', base_folder):
-    print("ERROR: credits.txt was not successfully copied!")
+    log_message("ERROR: credits.txt was not successfully copied!")
     all_files_copied = False
 
 if all_files_copied:
-    print("All files were successfully copied and verified!")
+    log_message("\nAll files were successfully copied and verified!")
 else:
-    print("Some files were not successfully copied. Please check the errors above.")
+    log_message("\nSome files were not successfully copied. Please check the errors above.")
