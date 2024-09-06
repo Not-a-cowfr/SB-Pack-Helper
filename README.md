@@ -16,9 +16,10 @@ Note that all this does is make and write the .properties files for an already s
 
         - You can use minecraft MOTD formatting codes in the description, which you can see [Here](https://htmlcolorcodes.com/minecraft-color-codes/)
 
-3. Done!
+3. Done! Check the 'Output' folder for your finished pack
 
 #### If any issues occur, dm `not_a_cow` on discord
+<small>(or fix it yourself and make a pr)</small>
 
 
 
