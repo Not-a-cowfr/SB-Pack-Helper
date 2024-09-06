@@ -3,22 +3,19 @@ import shutil
 import json
 import zipfile
 import logging as log
-from tkinter import Tk, filedialog, simpledialog, Checkbutton, BooleanVar, Toplevel, Button
+from tkinter import Tk, filedialog, simpledialog, messagebox, Checkbutton, IntVar, Label, Button
 from github import Github
-
-""" Change the default before committing, zip=enabled, log=disabled debug=disabled """
-create_log = True
-create_zip = False
-enable_debug = True
-logger = None
 
 g = Github()  # if the repo ever changes to need your github token, put it here
 neurepo = g.get_repo("NotEnoughUpdates/NotEnoughUpdates-REPO")
+
+logger = None
 
 def setup_logger(log_file_path, enable_debug):
     global logger
     logger = log.getLogger()
 
+    # Set log level based on enable_debug flag
     if enable_debug:
         logger.setLevel(log.DEBUG)
     else:
@@ -41,7 +38,6 @@ def select_folder():
     root.destroy()
     return folder_path
 
-
 def prompt_for_folder_name():
     root = Tk()
     root.withdraw()
@@ -49,39 +45,30 @@ def prompt_for_folder_name():
     root.destroy()
     return folder_name
 
-
-def prompt_for_options():
+def show_options_popup():
     root = Tk()
-    root.withdraw()
-    options_window = Toplevel(root)
+    root.title("Configuration")
 
-    options_window.title("File Creation Options")
+    zip_var = IntVar(value=1)
+    log_var = IntVar(value=0)
+    debug_var = IntVar(value=0)
 
-    zip_var = BooleanVar(value=create_zip)
-    log_var = BooleanVar(value=create_log)
-    debug_var = BooleanVar(value=enable_debug)
+    Label(root, text="Enable options for your task:").pack()
 
-    zip_checkbox = Checkbutton(options_window, text="Create Zip File", variable=zip_var)
-    zip_checkbox.pack()
+    Checkbutton(root, text="Create zip file", variable=zip_var).pack()
+    Checkbutton(root, text="Create log file", variable=log_var).pack()
+    Checkbutton(root, text="Enable debug logs", variable=debug_var).pack()
 
-    log_checkbox = Checkbutton(options_window, text="Create Log File", variable=log_var)
-    log_checkbox.pack()
-
-    debug_checkbox = Checkbutton(options_window, text="Enable Debug Logs", variable=debug_var)
-    debug_checkbox.pack()
-
-    def confirm_options():
+    def on_submit():
         global create_zip, create_log, enable_debug
-        create_zip = zip_var.get()
-        create_log = log_var.get()
-        enable_debug = debug_var.get()
-        options_window.destroy()
+        create_zip = zip_var.get() == 1
+        create_log = log_var.get() == 1
+        enable_debug = debug_var.get() == 1
+        root.destroy()
 
-    confirm_button = Button(options_window, text="Confirm", command=confirm_options)
-    confirm_button.pack()
+    Button(root, text="Submit", command=on_submit).pack()
 
-    options_window.mainloop()
-
+    root.mainloop()
 
 def get_unique_name(base_path, name_type="file/folder"):
     if not os.path.exists(base_path):
@@ -99,7 +86,6 @@ def get_unique_name(base_path, name_type="file/folder"):
             return new_path
         counter += 1
 
-
 def convert_json_to_properties(json_content, destination_properties_path, png_file):
     try:
         data = json.loads(json_content)
@@ -115,7 +101,6 @@ def convert_json_to_properties(json_content, destination_properties_path, png_fi
     except json.JSONDecodeError:
         if logger:
             logger.error("Error decoding JSON content.")
-
 
 def extract_files(source_folder, cit_folder, ctm_folder, exclude_files=None):
     if exclude_files is None:
@@ -140,8 +125,7 @@ def extract_files(source_folder, cit_folder, ctm_folder, exclude_files=None):
 
     return png_files
 
-
-def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder):
+def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder, delay_between_copies=False):
     current_script_dir = os.path.dirname(os.path.abspath(__file__))
     local_properties_folders = {
         'crystal_hollows': os.path.join(current_script_dir, 'crystal_hollows_properties'),
@@ -179,39 +163,31 @@ def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder):
             if logger:
                 logger.error(f"Could not find or convert {json_file_path}: {e}")
 
-
 def file_exists_in_folder(file_name, folder):
     return os.path.exists(os.path.join(folder, file_name))
 
-
-# Folder selection + fatal errors idk how to describe them
-source_folder = select_folder()  # Prompt for user to select folder, log error if no folder is selected
+# Main script
+source_folder = select_folder()
 if not source_folder:
     if logger:
         logger.fatal("No folder selected!")
     exit()
 
-    exit()
-
 destination_folder_name = prompt_for_folder_name()
-destination_folder_name = prompt_for_folder_name()  # Prompts user for folder name
 if not destination_folder_name:
     if logger:
         logger.fatal("No folder name provided!")
-       logger.fatal("No folder name provided!")
     exit()
 
-prompt_for_options()
+show_options_popup()  # Show popup to get user preferences
 
 output_folder = os.path.join(os.getcwd(), 'output')
+log_name = get_unique_name(destination_folder_name)
 os.makedirs(output_folder, exist_ok=True)
 
 if create_log:
     log_file_path = get_unique_name(os.path.join(output_folder, f'{destination_folder_name}.log'), "log file")
-    setup_logger(log_file_path, enable_debug)
-
-    if not enable_debug:
-        logger.setLevel(log.INFO)
+    setup_logger(log_file_path, enable_debug)  # Pass enable_debug to control the log level
 
 base_folder = get_unique_name(os.path.join(output_folder, destination_folder_name), "folder")
 if not base_folder:
@@ -241,15 +217,14 @@ if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cred
     creditsfile = True
 else:
     if logger:
-        logger.warning("Didn't find credits.txt, continuing without it") # feels not important enough for a warning, but also more important than just an info log, idk
+        logger.warning("Didn't find credits.txt, continuing without it")
 
-# The code gets tuah point where it makes the actual files
 exclude_files = ['pack.png', 'pack.mcmeta']
 png_files = extract_files(source_folder, mcpatcher_cit_folder, mcpatcher_ctm_folder, exclude_files)
-copy_files_or_use_local_properties(png_files, neurepo, mcpatcher_cit_folder, mcpatcher_ctm_folder)
 
-# file checks
-# todo: delete cit folder and all children if empty
+copy_files_or_use_local_properties(png_files, neurepo, mcpatcher_cit_folder, mcpatcher_ctm_folder,
+                                   delay_between_copies=True)
+
 if os.path.exists(mcpatcher_ctm_folder) and not os.listdir(mcpatcher_ctm_folder):
     os.rmdir(mcpatcher_ctm_folder)
     if logger:
