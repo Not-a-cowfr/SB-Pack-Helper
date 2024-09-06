@@ -3,22 +3,27 @@ import shutil
 import json
 import zipfile
 import logging as log
-from tkinter import Tk, filedialog, simpledialog
+from tkinter import Tk, filedialog, simpledialog,  Checkbutton, IntVar, Label, Button
 from github import Github
-
-create_log = True
-create_zip = False
 
 g = Github()  # if the repo ever changes to need your github token, put it here
 neurepo = g.get_repo("NotEnoughUpdates/NotEnoughUpdates-REPO")
 
+# defining some variables, first three are for settings, settings wont work if you do not have these defined
+enable_zip = True
+enable_log = False
+enable_debug = False
 logger = None
 
-
-def setup_logger(log_file_path):
+def setup_logger(log_file_path, enable_debug):
     global logger
     logger = log.getLogger()
-    logger.setLevel(log.DEBUG)
+
+    if enable_debug:
+        logger.setLevel(log.DEBUG)
+    else:
+        logger.setLevel(log.INFO)
+
     formatter = log.Formatter('%(asctime)s.%(msecs)03d [%(levelname)s] | %(message)s', datefmt='%H:%M:%S')
 
     file_handler = log.FileHandler(log_file_path)
@@ -29,14 +34,12 @@ def setup_logger(log_file_path):
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-
 def select_folder():
     root = Tk()
     root.withdraw()
     folder_path = filedialog.askdirectory()
     root.destroy()
     return folder_path
-
 
 def prompt_for_folder_name():
     root = Tk()
@@ -45,8 +48,33 @@ def prompt_for_folder_name():
     root.destroy()
     return folder_name
 
+def show_options_popup():
+    root = Tk()
+    root.title("Configuration")
+
+    zip_var = IntVar(value=1)
+    log_var = IntVar(value=0)
+    debug_var = IntVar(value=0)
+
+    Label(root, text="Enable options for your task:").pack()
+
+    Checkbutton(root, text="Create zip file", variable=zip_var).pack()
+    Checkbutton(root, text="Create log file", variable=log_var).pack()
+    Checkbutton(root, text="Enable debug logs", variable=debug_var).pack()
+
+    def on_submit():
+        global create_zip, create_log, enable_debug
+        create_zip = zip_var.get() == 1
+        create_log = log_var.get() == 1
+        enable_debug = debug_var.get() == 1
+        root.destroy()
+
+    Button(root, text="Submit", command=on_submit).pack()
+
+    root.mainloop()
 
 def get_unique_name(base_path, name_type="file/folder"):
+    global new_path
     if not os.path.exists(base_path):
         return base_path
 
@@ -57,10 +85,10 @@ def get_unique_name(base_path, name_type="file/folder"):
         new_path = f"{base_name}({counter}){ext}"
         if not os.path.exists(new_path):
             if logger:
-                logger.warning(f"Avoided using duplicate {name_type} name, renamed to: {new_path}")
+                renamed = os.path.basename(new_path)
+                logger.warning(f"Avoided using duplicate {name_type} name, renamed to: {renamed}")
             return new_path
         counter += 1
-
 
 def convert_json_to_properties(json_content, destination_properties_path, png_file):
     try:
@@ -77,7 +105,6 @@ def convert_json_to_properties(json_content, destination_properties_path, png_fi
     except json.JSONDecodeError:
         if logger:
             logger.error("Error decoding JSON content.")
-
 
 def extract_files(source_folder, cit_folder, ctm_folder, exclude_files=None):
     if exclude_files is None:
@@ -102,8 +129,7 @@ def extract_files(source_folder, cit_folder, ctm_folder, exclude_files=None):
 
     return png_files
 
-
-def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder, delay_between_copies=False):
+def copy_files_or_use_local_properties(png_files, repo):
     current_script_dir = os.path.dirname(os.path.abspath(__file__))
     local_properties_folders = {
         'crystal_hollows': os.path.join(current_script_dir, 'crystal_hollows_properties'),
@@ -141,10 +167,13 @@ def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder, 
             if logger:
                 logger.error(f"Could not find or convert {json_file_path}: {e}")
 
-
 def file_exists_in_folder(file_name, folder):
     return os.path.exists(os.path.join(folder, file_name))
 
+
+
+
+# Main script
 source_folder = select_folder()
 if not source_folder:
     if logger:
@@ -157,13 +186,15 @@ if not destination_folder_name:
         logger.fatal("No folder name provided!")
     exit()
 
+show_options_popup()
+
 output_folder = os.path.join(os.getcwd(), 'output')
 log_name = get_unique_name(destination_folder_name)
 os.makedirs(output_folder, exist_ok=True)
 
 if create_log:
     log_file_path = get_unique_name(os.path.join(output_folder, f'{destination_folder_name}.log'), "log file")
-    setup_logger(log_file_path)
+    setup_logger(log_file_path, enable_debug)
 
 base_folder = get_unique_name(os.path.join(output_folder, destination_folder_name), "folder")
 if not base_folder:
@@ -198,8 +229,7 @@ else:
 exclude_files = ['pack.png', 'pack.mcmeta']
 png_files = extract_files(source_folder, mcpatcher_cit_folder, mcpatcher_ctm_folder, exclude_files)
 
-copy_files_or_use_local_properties(png_files, neurepo, mcpatcher_cit_folder, mcpatcher_ctm_folder,
-                                   delay_between_copies=True)
+copy_files_or_use_local_properties(png_files, neurepo)
 
 if os.path.exists(mcpatcher_ctm_folder) and not os.listdir(mcpatcher_ctm_folder):
     os.rmdir(mcpatcher_ctm_folder)
@@ -216,21 +246,21 @@ if create_zip:
         logger.info(f"Folder {destination_folder_name} was zipped into {zip_file_name}")
 
 all_files_copied = True
-if not file_exists_in_folder('pack.png', base_folder):
+if not file_exists_in_folder('pack.png', new_path):
     if logger:
-        logger.error("pack.png was not moved correctly.")
+        logger.error(f"pack.png was not cloned into {new_path}.")
     all_files_copied = False
 
 if os.path.exists(
         os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pack.mcmeta')) and not file_exists_in_folder(
-        'pack.mcmeta', base_folder):
+        'pack.mcmeta', new_path):
     if logger:
-        logger.error("pack.mcmeta was not moved correctly.")
+        logger.error(f"pack.mcmeta was not cloned into {new_path}.")
     all_files_copied = False
 
-if creditsfile and not file_exists_in_folder('credits.txt', base_folder):
+if creditsfile and not file_exists_in_folder('credits.txt', new_path):
     if logger:
-        logger.error("credits.txt was not moved correctly.")
+        logger.error(f"credits.txt was not cloned into {new_path}.")
     all_files_copied = False
 
 if not all_files_copied:
@@ -239,4 +269,3 @@ if not all_files_copied:
 else:
     if logger:
         logger.info("All files were successfully copied and verified!")
-        logger.debug(log_name)
