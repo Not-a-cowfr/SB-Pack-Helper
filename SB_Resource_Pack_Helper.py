@@ -3,19 +3,21 @@ import shutil
 import json
 import zipfile
 import logging as log
-from tkinter import Tk, filedialog, simpledialog, messagebox, Checkbutton, IntVar, Label, Button
+from tkinter import Tk, filedialog, simpledialog,  Checkbutton, IntVar, Label, Button
 from github import Github
 
 g = Github()  # if the repo ever changes to need your github token, put it here
 neurepo = g.get_repo("NotEnoughUpdates/NotEnoughUpdates-REPO")
 
+enable_zip = True
+enable_log = False
+enable_debug = False
 logger = None
 
 def setup_logger(log_file_path, enable_debug):
     global logger
     logger = log.getLogger()
 
-    # Set log level based on enable_debug flag
     if enable_debug:
         logger.setLevel(log.DEBUG)
     else:
@@ -114,6 +116,7 @@ def extract_files(source_folder, cit_folder, ctm_folder, exclude_files=None):
                 source_file = os.path.join(root, file)
                 relative_path = os.path.relpath(root, source_folder)
                 file_base_name = file.lower().replace('.png', '')
+                global destination_dir
                 destination_dir = os.path.join(
                     ctm_folder if "dwarven_mines" in relative_path or "crystal_hollows" in relative_path else cit_folder,
                     relative_path, file_base_name)
@@ -125,7 +128,7 @@ def extract_files(source_folder, cit_folder, ctm_folder, exclude_files=None):
 
     return png_files
 
-def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder, delay_between_copies=False):
+def copy_files_or_use_local_properties(png_files, repo):
     current_script_dir = os.path.dirname(os.path.abspath(__file__))
     local_properties_folders = {
         'crystal_hollows': os.path.join(current_script_dir, 'crystal_hollows_properties'),
@@ -166,6 +169,9 @@ def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder, 
 def file_exists_in_folder(file_name, folder):
     return os.path.exists(os.path.join(folder, file_name))
 
+
+
+
 # Main script
 source_folder = select_folder()
 if not source_folder:
@@ -179,7 +185,7 @@ if not destination_folder_name:
         logger.fatal("No folder name provided!")
     exit()
 
-show_options_popup()  # Show popup to get user preferences
+show_options_popup()
 
 output_folder = os.path.join(os.getcwd(), 'output')
 log_name = get_unique_name(destination_folder_name)
@@ -187,7 +193,7 @@ os.makedirs(output_folder, exist_ok=True)
 
 if create_log:
     log_file_path = get_unique_name(os.path.join(output_folder, f'{destination_folder_name}.log'), "log file")
-    setup_logger(log_file_path, enable_debug)  # Pass enable_debug to control the log level
+    setup_logger(log_file_path, enable_debug)
 
 base_folder = get_unique_name(os.path.join(output_folder, destination_folder_name), "folder")
 if not base_folder:
@@ -222,8 +228,7 @@ else:
 exclude_files = ['pack.png', 'pack.mcmeta']
 png_files = extract_files(source_folder, mcpatcher_cit_folder, mcpatcher_ctm_folder, exclude_files)
 
-copy_files_or_use_local_properties(png_files, neurepo, mcpatcher_cit_folder, mcpatcher_ctm_folder,
-                                   delay_between_copies=True)
+copy_files_or_use_local_properties(png_files, neurepo)
 
 if os.path.exists(mcpatcher_ctm_folder) and not os.listdir(mcpatcher_ctm_folder):
     os.rmdir(mcpatcher_ctm_folder)
@@ -240,21 +245,21 @@ if create_zip:
         logger.info(f"Folder {destination_folder_name} was zipped into {zip_file_name}")
 
 all_files_copied = True
-if not file_exists_in_folder('pack.png', base_folder):
+if not file_exists_in_folder('pack.png', destination_dir):
     if logger:
-        logger.error("pack.png was not moved correctly.")
+        logger.error(f"pack.png was not cloned into {destination_dir}.")
     all_files_copied = False
 
 if os.path.exists(
         os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pack.mcmeta')) and not file_exists_in_folder(
-        'pack.mcmeta', base_folder):
+        'pack.mcmeta', destination_dir):
     if logger:
-        logger.error("pack.mcmeta was not moved correctly.")
+        logger.error(f"pack.mcmeta was not cloned into {destination_dir}.")
     all_files_copied = False
 
-if creditsfile and not file_exists_in_folder('credits.txt', base_folder):
+if creditsfile and not file_exists_in_folder('credits.txt', destination_dir):
     if logger:
-        logger.error("credits.txt was not moved correctly.")
+        logger.error(f"credits.txt was not cloned into {destination_dir}.")
     all_files_copied = False
 
 if not all_files_copied:
