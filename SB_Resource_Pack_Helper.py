@@ -3,22 +3,29 @@ import shutil
 import json
 import zipfile
 import logging as log
-from tkinter import Tk, filedialog, simpledialog
+from tkinter import Tk, filedialog, simpledialog, Checkbutton, BooleanVar, Toplevel, Button
 from github import Github
 
+""" Change the default before commiting, zip=enabled, log=disabled debug=disabled """
 create_log = True
 create_zip = False
+enable_debug = True
+logger = None
 
 g = Github()  # if the repo ever changes to need your github token, put it here
 neurepo = g.get_repo("NotEnoughUpdates/NotEnoughUpdates-REPO")
 
-logger = None
 
 
-def setup_logger(log_file_path):
+def setup_logger(log_file_path, enable_debug):
     global logger
     logger = log.getLogger()
-    logger.setLevel(log.DEBUG)
+
+    if enable_debug:
+        logger.setLevel(log.DEBUG)
+    else:
+        logger.setLevel(log.INFO)
+
     formatter = log.Formatter('%(asctime)s.%(msecs)03d [%(levelname)s] | %(message)s', datefmt='%H:%M:%S')
 
     file_handler = log.FileHandler(log_file_path)
@@ -29,14 +36,12 @@ def setup_logger(log_file_path):
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-
 def select_folder():
     root = Tk()
     root.withdraw()
     folder_path = filedialog.askdirectory()
     root.destroy()
     return folder_path
-
 
 def prompt_for_folder_name():
     root = Tk()
@@ -45,6 +50,37 @@ def prompt_for_folder_name():
     root.destroy()
     return folder_name
 
+def prompt_for_options():
+    root = Tk()
+    root.withdraw()
+    options_window = Toplevel(root)
+
+    options_window.title("File Creation Options")
+
+    zip_var = BooleanVar(value=create_zip)
+    log_var = BooleanVar(value=create_log)
+    debug_var = BooleanVar(value=enable_debug)
+
+    zip_checkbox = Checkbutton(options_window, text="Create Zip File", variable=zip_var)
+    zip_checkbox.pack()
+
+    log_checkbox = Checkbutton(options_window, text="Create Log File", variable=log_var)
+    log_checkbox.pack()
+
+    debug_checkbox = Checkbutton(options_window, text="Enable Debug Logs", variable=debug_var)
+    debug_checkbox.pack()
+
+    def confirm_options():
+        global create_zip, create_log, enable_debug
+        create_zip = zip_var.get()
+        create_log = log_var.get()
+        enable_debug = debug_var.get()
+        options_window.destroy()
+
+    confirm_button = Button(options_window, text="Confirm", command=confirm_options)
+    confirm_button.pack()
+
+    options_window.mainloop()
 
 def get_unique_name(base_path, name_type="file/folder"):
     if not os.path.exists(base_path):
@@ -57,7 +93,8 @@ def get_unique_name(base_path, name_type="file/folder"):
         new_path = f"{base_name}({counter}){ext}"
         if not os.path.exists(new_path):
             if logger:
-                logger.warning(f"Avoided using duplicate {name_type} name, renamed to: {new_path}")
+                renamed = os.path.basename(new_path)
+                logger.warning(f"Avoided using duplicate {name_type} name, renamed to: {renamed}")
             return new_path
         counter += 1
 
@@ -145,6 +182,8 @@ def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder, 
 def file_exists_in_folder(file_name, folder):
     return os.path.exists(os.path.join(folder, file_name))
 
+
+
 source_folder = select_folder()
 if not source_folder:
     if logger:
@@ -157,6 +196,8 @@ if not destination_folder_name:
         logger.fatal("No folder name provided!")
     exit()
 
+prompt_for_options()
+
 output_folder = os.path.join(os.getcwd(), 'output')
 log_name = get_unique_name(destination_folder_name)
 os.makedirs(output_folder, exist_ok=True)
@@ -164,6 +205,9 @@ os.makedirs(output_folder, exist_ok=True)
 if create_log:
     log_file_path = get_unique_name(os.path.join(output_folder, f'{destination_folder_name}.log'), "log file")
     setup_logger(log_file_path)
+
+    if not enable_debug:
+        logger.setLevel(log.INFO)
 
 base_folder = get_unique_name(os.path.join(output_folder, destination_folder_name), "folder")
 if not base_folder:
@@ -201,6 +245,9 @@ png_files = extract_files(source_folder, mcpatcher_cit_folder, mcpatcher_ctm_fol
 copy_files_or_use_local_properties(png_files, neurepo, mcpatcher_cit_folder, mcpatcher_ctm_folder,
                                    delay_between_copies=True)
 
+
+# file checks
+# todo: delete cit folder and all children if empty
 if os.path.exists(mcpatcher_ctm_folder) and not os.listdir(mcpatcher_ctm_folder):
     os.rmdir(mcpatcher_ctm_folder)
     if logger:
@@ -239,4 +286,3 @@ if not all_files_copied:
 else:
     if logger:
         logger.info("All files were successfully copied and verified!")
-        logger.debug(log_name)
