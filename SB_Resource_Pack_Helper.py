@@ -6,7 +6,7 @@ import logging as log
 from tkinter import Tk, filedialog, simpledialog, Checkbutton, BooleanVar, Toplevel, Button
 from github import Github
 
-""" Change the default before commiting, zip=enabled, log=disabled debug=disabled """
+""" Change the default before committing, zip=enabled, log=disabled debug=disabled """
 create_log = True
 create_zip = False
 enable_debug = True
@@ -14,8 +14,6 @@ logger = None
 
 g = Github()  # if the repo ever changes to need your github token, put it here
 neurepo = g.get_repo("NotEnoughUpdates/NotEnoughUpdates-REPO")
-
-
 
 def setup_logger(log_file_path, enable_debug):
     global logger
@@ -43,12 +41,14 @@ def select_folder():
     root.destroy()
     return folder_path
 
+
 def prompt_for_folder_name():
     root = Tk()
     root.withdraw()
     folder_name = simpledialog.askstring("Input", "Enter the name for the new folder:")
     root.destroy()
     return folder_name
+
 
 def prompt_for_options():
     root = Tk()
@@ -81,6 +81,7 @@ def prompt_for_options():
     confirm_button.pack()
 
     options_window.mainloop()
+
 
 def get_unique_name(base_path, name_type="file/folder"):
     if not os.path.exists(base_path):
@@ -140,7 +141,7 @@ def extract_files(source_folder, cit_folder, ctm_folder, exclude_files=None):
     return png_files
 
 
-def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder, delay_between_copies=False):
+def copy_files_or_use_local_properties(png_files, repo, cit_folder, ctm_folder):
     current_script_dir = os.path.dirname(os.path.abspath(__file__))
     local_properties_folders = {
         'crystal_hollows': os.path.join(current_script_dir, 'crystal_hollows_properties'),
@@ -183,28 +184,31 @@ def file_exists_in_folder(file_name, folder):
     return os.path.exists(os.path.join(folder, file_name))
 
 
-
-source_folder = select_folder()
+# Folder selection + fatal errors idk how to describe them
+source_folder = select_folder()  # Prompt for user to select folder, log error if no folder is selected
 if not source_folder:
     if logger:
         logger.fatal("No folder selected!")
     exit()
 
+    exit()
+
 destination_folder_name = prompt_for_folder_name()
+destination_folder_name = prompt_for_folder_name()  # Prompts user for folder name
 if not destination_folder_name:
     if logger:
         logger.fatal("No folder name provided!")
+       logger.fatal("No folder name provided!")
     exit()
 
 prompt_for_options()
 
 output_folder = os.path.join(os.getcwd(), 'output')
-log_name = get_unique_name(destination_folder_name)
 os.makedirs(output_folder, exist_ok=True)
 
 if create_log:
     log_file_path = get_unique_name(os.path.join(output_folder, f'{destination_folder_name}.log'), "log file")
-    setup_logger(log_file_path)
+    setup_logger(log_file_path, enable_debug)
 
     if not enable_debug:
         logger.setLevel(log.INFO)
@@ -237,14 +241,12 @@ if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cred
     creditsfile = True
 else:
     if logger:
-        logger.warning("Didn't find credits.txt, continuing without it")
+        logger.warning("Didn't find credits.txt, continuing without it") # feels not important enough for a warning, but also more important than just an info log, idk
 
+# The code gets tuah point where it makes the actual files
 exclude_files = ['pack.png', 'pack.mcmeta']
 png_files = extract_files(source_folder, mcpatcher_cit_folder, mcpatcher_ctm_folder, exclude_files)
-
-copy_files_or_use_local_properties(png_files, neurepo, mcpatcher_cit_folder, mcpatcher_ctm_folder,
-                                   delay_between_copies=True)
-
+copy_files_or_use_local_properties(png_files, neurepo, mcpatcher_cit_folder, mcpatcher_ctm_folder)
 
 # file checks
 # todo: delete cit folder and all children if empty
